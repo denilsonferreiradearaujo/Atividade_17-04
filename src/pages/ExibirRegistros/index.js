@@ -48,45 +48,59 @@ export default function ExibirRegistros() {
   }, []);
 
   // Função utilizada para excluir um registro
-  const deletarUsuario = (id) => {
+  const deletarUsuario = (idCliente) => {
     db.transaction(
       tx => {
+        // Primeiro, remover registros associados nas tabelas de telefones
         tx.executeSql(
-          'DROP table tbl_clientes where id=?',
-          [id],
-          (_, {insertId:idCliente}) => {
-
-            tx.executeSql(
-              'DROP table tbl_telefones where id=?',
-              [id],
-              (_, {insertId:idTelefone}) => {
-
-                tx.executeSql(
-                  'DROP table clientes_has_telefones where id=(?,?)',
-                  [idCliente, idTelefone],
-                  (_, { rowsAffected }) => {
-                    console.log(rowsAffected);
-
-                    Alert.alert('Inserido com sucesso! FK');
-                  },
-                  (_, error) => {
-                    console.error('Erro ao adicionar registro:', error);
-                    Alert.alert('Erro', 'Ocorreu um erro ao adicionar registro.2');
-                  }
-                );
-
-              },
-              (_, error) => {
-                console.error('Erro ao adicionar registro:', error);
-                Alert.alert('Erro', 'Ocorreu um erro ao adicionar registro.1');
-              }
-            );
+          'DELETE FROM clientes_has_telefones WHERE id_clientes =? AND id_telefones =?',
+          [idCliente, idTelefones],
+          (_, { rowsAffected }) => {
+            console.log(`Telefones excluídos: ${rowsAffected}`);
           },
           (_, error) => {
-            console.error('Erro ao adicionar registro:', error);
-            Alert.alert('Erro', 'Ocorreu um erro ao adicionar registro.0');
+            console.error('Erro ao excluir telefones', error);
+            Alert.alert('Erro', 'Ocorreu um erro ao excluir telefones!');
           }
         );
+
+        // Segundo, remover os registros da tabela de relação
+        tx.executeSql(
+          'DELETE FROM clientes_has_telefones WHERE id_clientes = ?',
+          [idCliente],
+          (_, { rowsAffected }) => {
+            console.log(`Relações excluídas: ${rowsAffected}`);
+          },
+          (_, error) => {
+            console.error('Erro ao excluir relação', error);
+            Alert.alert('Erro', 'Ocorreu um erro ao excluir relação!');
+          }
+        );
+
+        // Terceiro, remover o cliente
+        tx.executeSql(
+          'DELETE FROM tbl_clientes WHERE id = ?',
+          [idCliente],
+          (_, { rowsAffected }) => {
+            console.log(`Cliente excluído: ${rowsAffected}`);
+            if (rowsAffected > 0) {
+              ExibirRegistros();
+              Alert.alert('Sucesso', 'Registro excluído com sucesso!');
+            } else {
+              Alert.alert('Erro', 'Registro não excluído, verifique e tente novamente!');
+            }
+          },
+          (_, error) => {
+            console.error('Erro ao excluir o cliente', error);
+            Alert.alert('Erro', 'Ocorreu um erro ao excluir o cliente!');
+          }
+        );
+      },
+      error => {
+        console.error('Erro na transação', error);
+      },
+      () => {
+        console.log('Transação de exclusão concluída');
       }
     );
   }
@@ -102,30 +116,51 @@ export default function ExibirRegistros() {
             {/* A propriedade key é usada pelo React para identificar de forma única cada elemento na lista, o que é crucial para que o React possa otimizar a renderização e o desempenho. */}
             {todos.map(usuario => (
               <View key={usuario.id} style={styles.usuarioItem}>
-                <Text style={styles.linha}>{usuario.id}</Text>
-                <Text style={styles.linha}>{usuario.nome}</Text>
-                <Text style={styles.linha}>{usuario.data_nasc}</Text>
-                <Text style={styles.linha}>{usuario.numero}</Text>
-                <Text style={styles.linha}>{usuario.tipo}</Text>
-                <TouchableOpacity onPress={() => {
-                    Alert.alert(
-                      "Atenção!",
-                      'Deseja excluir o registro selecionado?',
-                      [
-                        {
-                          text: 'Cancelar',
-                          onPress: () => { return }
-                        },
-                        {
-                          text: 'OK',
-                          onPress: () => deletarUsuario(usuario.id)
-                        }
 
-                      ],
-                    )
-                  }}>
-                    <FontAwesome6 name='trash-can' color='red' size={24} />
-                  </TouchableOpacity>
+                {/* <View>
+                  <Text style={styles.linha}>Id: </Text>
+                  <Text style={styles.linha}>{usuario.id}</Text>
+                </View> */}
+
+                <View>
+                  <Text style={styles.linha}>Nome: </Text>
+                  <Text style={styles.linha}>{usuario.nome}</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.linha}>Data Nasc.: </Text>
+                  <Text style={styles.linha}>{usuario.data_nasc}</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.linha}>Tel.: </Text>
+                  <Text style={styles.linha}>{usuario.numero}</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.linha}>Tipo tel.: </Text>
+                  <Text style={styles.linha}>{usuario.tipo}</Text>
+                </View>
+
+                <TouchableOpacity onPress={() => {
+                  Alert.alert(
+                    "Atenção!",
+                    'Deseja excluir o registro selecionado?',
+                    [
+                      {
+                        text: 'Cancelar',
+                        onPress: () => { return }
+                      },
+                      {
+                        text: 'OK',
+                        onPress: () => deletarUsuario(usuario.id)
+                      }
+
+                    ],
+                  )
+                }}>
+                  <FontAwesome6 name='trash-can' color='red' size={24} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -134,7 +169,6 @@ export default function ExibirRegistros() {
     </SafeAreaProvider>
   );
 }
-
 
 /**
  * Estilização dos componentes
@@ -174,23 +208,24 @@ const styles = StyleSheet.create({
   },
 
   usuarioItem: {
-    // flexDirection: 'row',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
     borderBlockColor: '#333',
     borderWidth: 2,
     borderRadius: 7,
-    padding: 5,
+    padding: 8,
   },
 
   linha: {
-    fontWeight: 'bold',
+    // fontWeight: 'bold',
     textAlign: 'center',
     color: '#873fda',
     margin: 2,
     marginBottom: 1,
-    fontSize: 20,
+    fontSize: 15,
+    paddingLeft: 5,
   },
 
   input: {

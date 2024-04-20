@@ -16,8 +16,6 @@ export default function CadastrarRegistro() {
 
   // Função utilizada para cadastrar os registros
 
-
-
   const CadastrarRegistro = () => {
     console.log('Acionando a função Cadastrar normalmente!')
 
